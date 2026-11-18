@@ -18,8 +18,8 @@ use core_text::{
     font::CTFont,
     font_collection::CTFontCollectionRef,
     font_descriptor::{
-        CTFontDescriptor, kCTFontSlantTrait, kCTFontSymbolicTrait, kCTFontWeightTrait,
-        kCTFontWidthTrait,
+        CTFontDescriptor, kCTFontColorGlyphsTrait, kCTFontSlantTrait, kCTFontSymbolicTrait,
+        kCTFontWeightTrait, kCTFontWidthTrait,
     },
     line::CTLine,
     string_attributes::kCTFontAttributeName,
@@ -70,7 +70,6 @@ struct MacTextSystemState {
     font_selections: HashMap<Font, FontId>,
     font_ids_by_postscript_name: HashMap<String, FontId>,
     font_ids_by_font_key: HashMap<FontKey, SmallVec<[FontId; 4]>>,
-    postscript_names_by_font_id: HashMap<FontId, String>,
 }
 
 impl MacTextSystem {
@@ -83,7 +82,6 @@ impl MacTextSystem {
             font_selections: HashMap::default(),
             font_ids_by_postscript_name: HashMap::default(),
             font_ids_by_font_key: HashMap::default(),
-            postscript_names_by_font_id: HashMap::default(),
         }))
     }
 }
@@ -378,9 +376,7 @@ impl MacTextSystemState {
             let font_id = FontId(self.fonts.len());
             font_ids.push(font_id);
             self.font_ids_by_postscript_name
-                .insert(postscript_name.clone(), font_id);
-            self.postscript_names_by_font_id
-                .insert(font_id, postscript_name);
+                .insert(postscript_name, font_id);
             self.fonts.push(font);
         }
         Ok(font_ids)
@@ -403,9 +399,7 @@ impl MacTextSystemState {
         } else {
             let font_id = FontId(self.fonts.len());
             self.font_ids_by_postscript_name
-                .insert(postscript_name.clone(), font_id);
-            self.postscript_names_by_font_id
-                .insert(font_id, postscript_name);
+                .insert(postscript_name, font_id);
             self.fonts
                 .push(font_kit::font::Font::from_core_graphics_font(
                     requested_font.copy_to_CGFont(),
@@ -414,12 +408,10 @@ impl MacTextSystemState {
         }
     }
 
+    /// Whether the font draws its glyphs in their own colors (Apple Color Emoji, or any
+    /// COLR/sbix font a mod loads), so they are rasterized in RGBA rather than as a mask.
     fn is_emoji(&self, font_id: FontId) -> bool {
-        self.postscript_names_by_font_id
-            .get(&font_id)
-            .is_some_and(|postscript_name| {
-                postscript_name == "AppleColorEmoji" || postscript_name == ".AppleColorEmojiUI"
-            })
+        self.fonts[font_id.0].native_font().symbolic_traits() & kCTFontColorGlyphsTrait != 0
     }
 
     fn raster_bounds(&self, params: &RenderGlyphParams) -> Result<Bounds<DevicePixels>> {
@@ -589,6 +581,7 @@ impl MacTextSystemState {
                     .unwrap()
             };
             let font_id = self.id_for_native_font(font);
+            let is_emoji = self.is_emoji(font_id);
 
             let glyphs = match runs.last_mut() {
                 Some(run) if run.font_id == font_id => &mut run.glyphs,
@@ -616,7 +609,7 @@ impl MacTextSystemState {
                     id: GlyphId(glyph_id as u32),
                     position: point(position.x as f32, position.y as f32).map(px),
                     index: ix_converter.utf8_ix,
-                    is_emoji: self.is_emoji(font_id),
+                    is_emoji,
                 });
             }
         }
