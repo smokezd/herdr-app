@@ -6772,6 +6772,14 @@ globalThis.__gpui = (() => {
       }
       __scroll_to_item(handle, index);
     },
+    scroll_by: (dy) => {
+      if (!Number.isFinite(dy)) throw new TypeError("scroll_by(dy) needs a finite number of pixels");
+      __scroll_by(handle, dy);
+    },
+    offset: () => {
+      const [y, max, height] = __scroll_offset(handle);
+      return { y, max, height };
+    },
     release: () => __scroll_release(handle),
   });
 

@@ -3048,6 +3048,14 @@ const BASE: &str = r#"  /** A row. */
      * Requests are consumed once, after layout; already visible children stay put.
      */
     scroll_to_item(index: number): void;
+    /** Scrolls `dy` px further down (negative goes up), within what the last
+     * layout measured. Call cx.notify() to repaint.
+     */
+    scroll_by(dy: number): void;
+    /** How far the area is scrolled, the furthest it can go, and its visible
+     * height, in px; all zero before its first layout.
+     */
+    offset(): { y: number; max: number; height: number };
     /** Releases the handle. Using it afterwards throws. */
     release(): boolean;
   }

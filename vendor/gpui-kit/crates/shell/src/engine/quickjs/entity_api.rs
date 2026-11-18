@@ -1220,6 +1220,42 @@ pub fn install(ctx: &Ctx<'_>, module: &Object<'_>, runtime: Weak<ShellRuntime>) 
             Ok(())
         }),
     )?;
+    // HERDR: scrolling by pixels, for keys like j/k or page down in a reader.
+    // `scroll_by` moves the area `dy` px further down (negative goes up),
+    // clamped to what the last layout measured; the script notifies to
+    // repaint. `offset` reports [scrolled, furthest, viewport height] in px,
+    // all zero before the area's first layout.
+    let scroll_by = runtime.clone();
+    globals.set(
+        "__scroll_by",
+        Func::from(move |ctx: Ctx<'_>, handle: EntityHandle, dy: f64| -> JsResult<()> {
+            let scroll = alive(&ctx, &scroll_by)?
+                .entities().scroll(handle)
+                .ok_or_else(|| Exception::throw_type(&ctx, "this scroll handle has been released"))?;
+            let handle = &scroll.handle;
+            let mut offset = handle.offset();
+            let furthest = f32::from(handle.max_offset().y).max(0.);
+            let down = (-f32::from(offset.y) + dy as f32).clamp(0., furthest);
+            offset.y = gpui::px(-down);
+            handle.set_offset(offset);
+            Ok(())
+        }),
+    )?;
+    let scroll_offset = runtime.clone();
+    globals.set(
+        "__scroll_offset",
+        Func::from(move |ctx: Ctx<'_>, handle: EntityHandle| -> JsResult<Vec<f64>> {
+            let scroll = alive(&ctx, &scroll_offset)?
+                .entities().scroll(handle)
+                .ok_or_else(|| Exception::throw_type(&ctx, "this scroll handle has been released"))?;
+            let handle = &scroll.handle;
+            Ok(vec![
+                f64::from(-f32::from(handle.offset().y)),
+                f64::from(f32::from(handle.max_offset().y).max(0.)),
+                f64::from(f32::from(handle.bounds().size.height)),
+            ])
+        }),
+    )?;
     let discard_scroll = runtime.clone();
     globals.set(
         "__scroll_release",
