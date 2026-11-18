@@ -250,6 +250,16 @@ Name a pane (default: the focused one; asks the person when no name; an empty na
 | `pane` | no |
 | `name` | no |
 
+## `pane.font_size`
+
+Make a pane's terminal text (default: the focused one) bigger (step 1), smaller (step -1) or the app's size again (step 0), by tenths, or set its scale (1 is the app's size, 0.5 to 3).
+
+| Argument | Required |
+|---|---|
+| `step` | no |
+| `pane` | no |
+| `scale` | no |
+
 ## `pane.focus`
 
 Focus a pane (or the pane showing a terminal).

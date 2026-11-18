@@ -167,7 +167,8 @@ impl AppWindow {
         let (y, x) = padding(context);
         let size = inset(area, 2.0 * x * zoom, 2.0 * y * zoom);
         let size = pane_size(shown, size, pane, frame, focused, zoom)?;
-        Some(crate::terminal::grid_size(size, crate::terminal::cell_size(window)))
+        let font_scale = shown.find(pane).and_then(|n| n.font_scale).unwrap_or(1.0);
+        Some(crate::terminal::grid_size(size, crate::terminal::cell_size_scaled(window, font_scale)))
     }
 
     /// Use the full split layout even if it has never been drawn unzoomed.
@@ -218,6 +219,7 @@ impl AppWindow {
                 if let Some(t) = self.terms.get(&pane.id)
                     && let Some((cols, rows)) = self.shown_size(tab, &pane.id, window)
                 {
+                    let cell = crate::terminal::cell_size_scaled(window, pane.font_scale.unwrap_or(1.0));
                     t.view.read(cx).fit(cols, rows, cell, scale);
                 }
             }

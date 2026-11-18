@@ -58,6 +58,7 @@ pub const COMMANDS: &[Command] = &[
     cmd("tab.prev", &[], "Show the previous tab."),
     cmd("pane.zoom", &[opt("pane")], "Show only this pane of its tab, or all again."),
     cmd("pane.rename", &[opt("pane"), opt("name")], "Name a pane (default: the focused one; asks the person when no name; an empty name: unnamed again)."),
+    cmd("pane.font_size", &[opt("step"), opt("pane"), opt("scale")], "Make a pane's terminal text (default: the focused one) bigger (step 1), smaller (step -1) or the app's size again (step 0), by tenths, or set its scale (1 is the app's size, 0.5 to 3)."),
     cmd("pane.focus", &[opt("pane"), opt("terminal")], "Focus a pane (or the pane showing a terminal)."),
     cmd("pane.go", &[req("direction")], "Focus the pane or focusable mod to the \"left\", \"right\", \"up\" or \"down\"."),
     cmd("pane.resize", &[req("direction"), opt("pane"), opt("px")], "Move the border of a pane (default: the focused one) \"left\", \"right\", \"up\" or \"down\" by px (default 40), like dragging the divider."),

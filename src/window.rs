@@ -1933,7 +1933,7 @@ impl AppWindow {
                         self.live.get(addr).and_then(|r| r.get("title")).and_then(Value::as_str).map(str::to_owned)
                     });
                     panes.push(json!({
-                        "pane": p.id, "terminal": addr, "tab": ctx.id, "title": title.clone().unwrap_or_default(), "name": p.title,
+                        "pane": p.id, "terminal": addr, "tab": ctx.id, "title": title.clone().unwrap_or_default(), "name": p.title, "font_scale": p.font_scale.unwrap_or(1.0),
                         "cwd": self.cwds.get(addr), "branch": m.folder_info.get(addr).and_then(|f| f.branch.clone()),
                         "status": m.status(addr), "app": a.and_then(|a| a.app.clone()), "program": self.program(addr),
                         "focused": focused, "zoomed": zoomed, "movable": self.pane_movable(&p.id),
@@ -3119,7 +3119,7 @@ impl AppWindow {
             if !args.is_object() { args = json!({}); }
             args["machine"] = json!(machine);
         }
-        if matches!(name, "space.new" | "space.close" | "space.rename" | "space.move" | "tab.new" | "tab.close" | "tab.rename" | "tab.move" | "pane.split" | "pane.close" | "pane.swap" | "pane.rename" | "pane.resize" | "terminal.keep" | "terminal.park") {
+        if matches!(name, "space.new" | "space.close" | "space.rename" | "space.move" | "tab.new" | "tab.close" | "tab.rename" | "tab.move" | "pane.split" | "pane.close" | "pane.swap" | "pane.rename" | "pane.font_size" | "pane.resize" | "terminal.keep" | "terminal.park") {
             let node = ["id", "space", "pane"].into_iter().find_map(|k| Self::arg(&args, k));
             let target = node.and_then(|id| self.model.space(id).or_else(|| self.model.space_of(id))).or_else(|| self.model.active_space());
             let machine = if name == "space.new" { Self::arg(&args, "machine") }
@@ -3275,6 +3275,27 @@ impl AppWindow {
                 };
                 let name = name.trim();
                 node.title = (!name.is_empty()).then(|| name.to_owned());
+            }
+            "pane.font_size" => {
+                let Some(pane) = Self::owned(a, "pane").or_else(|| self.model.focused_pane()) else { return self.fail("no pane") };
+                // A step from a key comes as text ("pane.font_size:1"), from a script as a number.
+                let number = |k: &str| a.get(k).and_then(|v| v.as_f64().or_else(|| v.as_str()?.trim().parse().ok()));
+                let tab = self.model.tab_of(&pane).map(|c| c.id.clone());
+                let Some(node) = tab.and_then(|t| self.model.tab_mut(&t)).and_then(|c| c.root.find_mut(&pane)).filter(|n| n.is_pane()) else {
+                    return self.fail(format!("no pane {pane:?}"));
+                };
+                let now = node.font_scale.unwrap_or(1.0);
+                let scale = match (number("scale"), number("step")) {
+                    (Some(scale), None) => scale as f32,
+                    (None, Some(step)) if step == 0.0 => 1.0,
+                    (None, Some(step)) => ((now * 10.0).round() + step.signum() as f32) / 10.0,
+                    (None, None) => 1.0,
+                    _ => return self.fail("pane.font_size takes step or scale, not both"),
+                };
+                if !(0.5..=3.0).contains(&scale) {
+                    return self.fail(format!("pane font scale {scale} is outside 0.5..3"));
+                }
+                node.font_scale = ((scale - 1.0).abs() > f32::EPSILON).then_some(scale);
             }
             "tab.settle" | "tab.unsettle" => {
                 let Some(id) = Self::owned(a, "id").or(active_ctx) else { return self.fail("no tab") };
@@ -4646,6 +4667,7 @@ impl AppWindow {
         match content {
             Content::Terminal { .. } => match self.pane_term(&n.id) {
                 Some(t) => {
+                    t.view.update(cx, |v, cx| v.set_font_scale(n.font_scale.unwrap_or(1.0), cx));
                     let id = n.id.clone();
                     div()
                         .size_full()
@@ -5213,7 +5235,7 @@ fn swap_by(args: &Value) -> Result<SwapBy<'_>, String> {
 
 fn needs_model_pane(name: &str, args: &Value) -> bool {
     match name {
-        "pane.split" | "pane.close" | "pane.zoom" | "pane.swap" | "pane.rename" | "pane.resize" | "terminal.show" => AppWindow::arg(args, "pane").is_none(),
+        "pane.split" | "pane.close" | "pane.zoom" | "pane.swap" | "pane.rename" | "pane.font_size" | "pane.resize" | "terminal.show" => AppWindow::arg(args, "pane").is_none(),
         "pane.go" => true,
         "terminal.open" | "terminal.keep" => matches!(AppWindow::arg(args, "place"), Some("right" | "down")),
         _ => false,
@@ -6991,6 +7013,43 @@ mod tests {
             assert!(this.run_as("pane.rename", json!({ "pane": "p1" }), false, window, cx).get("error").is_some(), "scripts get no prompt");
             this.run("pane.rename", json!({}), window, cx);
             assert_eq!(this.overlays.iter().filter(|o| o.id == "rename").count(), 1, "a person is asked");
+        }));
+    }
+
+    #[test]
+    fn panes_take_a_font_scale() {
+        in_own_process("pane_font_size_steps_sets_and_resets");
+    }
+
+    #[gpui::test]
+    fn pane_font_size_steps_sets_and_resets(cx: &mut gpui::TestAppContext) {
+        use serde_json::json;
+        if !running_alone("pane_font_size_steps_sets_and_resets") {
+            return;
+        }
+        let (view, cx) = open_window(cx, "unused", "", json!({
+            "id": "root", "type": "block", "content": { "tab": "active" }
+        }));
+        cx.update(|window, cx| view.update(cx, |this, cx| {
+            this.model.add_space("sp1", "", "/tmp", crate::model::Tab::new("tb1", "", "p1", "t1"));
+            this.documents.entry(String::new()).or_default().available = true;
+            this.sync(window, cx);
+            let scale = |this: &super::AppWindow| this.model.tab("tb1").and_then(|c| c.root.find("p1")).and_then(|n| n.font_scale);
+            let ok = |r: serde_json::Value| assert!(r.get("error").is_none(), "{r}");
+            ok(this.run_as("pane.font_size", json!({ "pane": "p1", "step": 1 }), false, window, cx));
+            assert_eq!(scale(this), Some(1.1));
+            ok(this.run_as("pane.font_size", json!({ "step": "1" }), false, window, cx));
+            assert_eq!(scale(this), Some(1.2), "a key's text step, on the focused pane");
+            ok(this.run_as("pane.font_size", json!({ "step": -1 }), false, window, cx));
+            assert_eq!(scale(this), Some(1.1));
+            ok(this.run_as("pane.font_size", json!({ "scale": 2 }), false, window, cx));
+            assert_eq!(scale(this), Some(2.0));
+            ok(this.run_as("pane.font_size", json!({ "step": 0 }), false, window, cx));
+            assert_eq!(scale(this), None, "step 0: the app's size, nothing stored");
+            for bad in [json!({ "scale": 4 }), json!({ "scale": 1.5, "step": 1 }), json!({ "pane": "nope", "step": 1 })] {
+                assert!(this.run_as("pane.font_size", bad.clone(), false, window, cx).get("error").is_some(), "{bad}");
+            }
+            assert_eq!(scale(this), None);
         }));
     }
 

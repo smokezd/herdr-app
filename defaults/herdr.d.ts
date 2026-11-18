@@ -62,7 +62,7 @@ export function playSound(sound: string): null;
  * space, selected tab and keyboard focus; background tabs are appended in creation order.
  * With no space shown, a new space is shown even with focus: false.
  * Panes: pane.split {direction: "right" | "down", pane?}, pane.close {pane?}, pane.zoom {pane?}, pane.rename {pane?, name},
- *   pane.resize {direction, pane?, px?},
+ *   pane.resize {direction, pane?, px?}, pane.font_size {step? | scale?, pane?},
  *   pane.focus {pane | terminal}, pane.go {direction}, pane.swap {pane?, direction | target}.
  *   Pane menus get target { pane, terminal }.
  * Terminals: terminal.open {argv?, folder?, place?: "tab" | "right" | "down"}, terminal.kill {terminal},
@@ -218,6 +218,8 @@ export interface PaneInfo {
   title: string;
   /** The name someone gave it (`pane.rename`), or null. */
   name: string | null;
+  /** Its terminal text against the app's size (`pane.font_size`): 1 unless changed. */
+  font_scale?: number;
   /** Its live folder, and the git branch there. */
   cwd: string | null;
   branch: string | null;

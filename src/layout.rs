@@ -343,6 +343,9 @@ pub struct Node {
     /// A name for people: tab captions use it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    /// A pane: its terminal text at this many times the app's font size (`pane.font_size`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub font_scale: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background: Option<Background>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -419,6 +422,7 @@ impl Node {
             max: None,
             hidden: false,
             title: None,
+            font_scale: None,
             background: None,
             border: None,
             radius: None,
