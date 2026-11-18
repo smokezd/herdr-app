@@ -210,7 +210,7 @@ export interface PaneScroll {
 export interface PaneInfo {
   pane: string;
   /** null for a mod pane (`pane.split {mod}`): then `mod` names it, and only
-   *  pane, mod, tab, title, name, focused and zoomed are set. */
+   *  pane, mod, tab, title, name, font_scale, focused and zoomed are set. */
   terminal: string | null;
   mod?: string;
   tab: string;
@@ -218,7 +218,8 @@ export interface PaneInfo {
   title: string;
   /** The name someone gave it (`pane.rename`), or null. */
   name: string | null;
-  /** Its terminal text against the app's size (`pane.font_size`): 1 unless changed. */
+  /** Its text against the app's size (`pane.font_size`): 1 unless changed. A terminal
+   *  draws at it; a mod pane gets it here to size its own text. */
   font_scale?: number;
   /** Its live folder, and the git branch there. */
   cwd: string | null;

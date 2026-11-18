@@ -1924,7 +1924,7 @@ impl AppWindow {
                     let zoomed = ctx.zoomed.as_deref() == Some(p.id.as_str());
                     // A mod pane: what it shows, no terminal.
                     if let Some(Content::Mod { name, .. }) = p.content() {
-                        panes.push(json!({ "pane": p.id, "terminal": null, "mod": name, "tab": ctx.id, "title": name, "name": p.title, "focused": focused, "zoomed": zoomed, "movable": self.pane_movable(&p.id) }));
+                        panes.push(json!({ "pane": p.id, "terminal": null, "mod": name, "tab": ctx.id, "title": name, "name": p.title, "font_scale": p.font_scale.unwrap_or(1.0), "focused": focused, "zoomed": zoomed, "movable": self.pane_movable(&p.id) }));
                         continue;
                     }
                     let Some(addr) = p.terminal() else { continue };
